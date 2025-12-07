@@ -1,12 +1,20 @@
 import os
-from flask import Flask, request, jsonify
+import sys
+from flask import Flask, request, jsonify, send_from_directory
 from flask_migrate import Migrate
 from flask_cors import CORS
+
+# Add src directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from utils import APIException, generate_sitemap
 from admin import setup_admin
 from models import db, User, Character, Planet, Favorite, Vehicle
 
-app = Flask(__name__)
+# Get the parent directory (project root)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+app = Flask(__name__, static_folder=os.path.join(BASE_DIR, 'build'), static_url_path='')
 app.url_map.strict_slashes = False
 
 db_url = os.getenv("DATABASE_URL")
@@ -28,9 +36,10 @@ def handle_invalid_usage(error):
     return jsonify(error.to_dict()), error.status_code
 
 
-@app.route('/')
-def sitemap():
-    return generate_sitemap(app)
+# Sitemap removed - React handles root
+# @app.route('/')
+# def sitemap():
+#     return generate_sitemap(app)
 
 
 def get_current_user_id():
@@ -171,6 +180,17 @@ def delete_favorite_person(character_id):
     db.session.delete(fav)
     db.session.commit()
     return jsonify({"msg": "Favorite person removed"}), 200
+
+
+# Serve React frontend
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    """Serve React app for all non-API routes"""
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 
 if __name__ == '__main__':
